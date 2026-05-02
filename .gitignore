@@ -1,0 +1,36 @@
+# Umgebung & Secrets
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtuelle Umgebungen
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / Build
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
