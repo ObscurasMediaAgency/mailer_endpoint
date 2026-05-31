@@ -23,8 +23,9 @@ mailer_enpoint/
 ## Voraussetzungen
 
 - Python 3.11+
-- Ein Plesk-Mailkonto mit SMTP-Zugang (STARTTLS, Port 587)
+- Plesk-Server mit lokalem MTA (Postfix), der auf Port 25 lauscht
 - Auf Server A: Zugriff per SSH mit Superuser-Rechten
+- DNS-A-Record `mailer.ihre-domain.de` → IP-Adresse des Servers
 
 ---
 
@@ -58,11 +59,11 @@ Felder in `.env` befüllen:
 
 | Variable | Beschreibung |
 |---|---|
-| `SMTP_HOST` | Plesk-Mailserver, z. B. `mail.ihre-domain.de` |
-| `SMTP_PORT` | `587` (STARTTLS) |
+| `SMTP_HOST` | `localhost` (lokaler Plesk-MTA) |
+| `SMTP_PORT` | `25` (lokaler Postfix, kein TLS) |
 | `SMTP_USER` | Vollständige Mailadresse des Plesk-Kontos |
 | `SMTP_PASSWORD` | Passwort des Plesk-Kontos |
-| `SMTP_USE_TLS` | `true` |
+| `SMTP_USE_TLS` | `false` |
 | `SMTP_FROM_EMAIL` | Absenderadresse (identisch mit `SMTP_USER`) |
 | `API_KEY` | Langen zufälligen Schlüssel eintragen (s. u.) |
 | `RATE_LIMIT` | z. B. `20/minute` |
@@ -83,7 +84,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=www-data
+User=apache
 WorkingDirectory=/opt/mailer_endpoint
 EnvironmentFile=/opt/mailer_endpoint/.env
 ExecStart=/opt/mailer_endpoint/.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8025
@@ -101,12 +102,21 @@ systemctl start mailer-endpoint
 systemctl status mailer-endpoint
 ```
 
-### 5. Reverse Proxy in Plesk (Nginx)
+### 5. Subdomain & Reverse Proxy in Plesk (Nginx)
 
-In der Plesk-Oberfläche unter **Domains → ihre-domain.de → Apache & Nginx → Zusätzliche Nginx-Direktiven** eintragen:
+**5a. DNS** – A-Record beim DNS-Anbieter anlegen:
+```
+mailer.ihre-domain.de.  IN  A  <IP-Adresse des Servers>
+```
+
+**5b. Subdomain in Plesk anlegen** – unter **Domains → ihre-domain.de → Subdomains → Subdomain hinzufügen**:
+- Name: `mailer`
+- Anschließend unter der neuen Subdomain ein Let's-Encrypt-Zertifikat ausstellen lassen
+
+**5c. Nginx-Proxy** – in der Plesk-Oberfläche unter **Domains → mailer.ihre-domain.de → Apache & Nginx → Zusätzliche Nginx-Direktiven** eintragen:
 
 ```nginx
-location /mailer/ {
+location / {
     proxy_pass         http://127.0.0.1:8025/;
     proxy_set_header   Host              $host;
     proxy_set_header   X-Real-IP         $remote_addr;
@@ -116,7 +126,7 @@ location /mailer/ {
 ```
 
 Der Endpoint ist danach erreichbar unter:
-`https://ihre-domain.de/mailer/send`
+`https://mailer.ihre-domain.de/send`
 
 ### 6. Firewall absichern
 
@@ -136,7 +146,7 @@ iptables -A INPUT -p tcp --dport 8025 ! -s 127.0.0.1 -j DROP
 ### Einfache Text-Mail
 
 ```bash
-curl -X POST https://ihre-domain.de/mailer/send \
+curl -X POST https://mailer.ihre-domain.de/send \
   -H "X-API-Key: DEIN_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -184,7 +194,7 @@ base64 -w 0 rechnung.pdf
 ## API-Referenz
 
 Nach dem Start ist die interaktive Dokumentation verfügbar unter:
-`https://ihre-domain.de/mailer/docs`
+`https://mailer.ihre-domain.de/docs`
 
 > **Hinweis:** In der Produktion empfiehlt es sich, die Swagger-UI zu deaktivieren.
 > Dazu in [main.py](main.py) die Parameter `docs_url=None, redoc_url=None` in der `FastAPI(...)`-Initialisierung einkommentieren.
@@ -194,6 +204,6 @@ Nach dem Start ist die interaktive Dokumentation verfügbar unter:
 ## Liveness-Check
 
 ```bash
-curl https://ihre-domain.de/mailer/health
+curl https://mailer.ihre-domain.de/health
 # {"status":"ok"}
 ```
