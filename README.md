@@ -113,17 +113,43 @@ mailer.ihre-domain.de.  IN  A  <IP-Adresse des Servers>
 - Name: `mailer`
 - Anschließend unter der neuen Subdomain ein Let's-Encrypt-Zertifikat ausstellen lassen
 
-**5c. Nginx-Proxy** – in der Plesk-Oberfläche unter **Domains → mailer.ihre-domain.de → Apache & Nginx → Zusätzliche Nginx-Direktiven** eintragen:
+**5c. Nginx-Proxy** – in der Plesk-Oberfläche unter **Domains → mailer.ihre-domain.de → Apache & Nginx → Zusätzliche Nginx-Direktiven** die API-Pfade einzeln eintragen:
 
 ```nginx
-location / {
-    proxy_pass         http://127.0.0.1:8025/;
-    proxy_set_header   Host              $host;
+location /send {
+  proxy_pass         http://127.0.0.1:8025/send;
+  proxy_set_header   Host              $host;
+  proxy_set_header   X-Real-IP         $remote_addr;
+  proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+  proxy_set_header   X-Forwarded-Proto $scheme;
+}
+
+location /health {
+  proxy_pass         http://127.0.0.1:8025/health;
+  proxy_set_header   Host              $host;
+  proxy_set_header   X-Real-IP         $remote_addr;
+  proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+  proxy_set_header   X-Forwarded-Proto $scheme;
+}
+
+location /docs {
+  proxy_pass         http://127.0.0.1:8025/docs;
+  proxy_set_header   Host              $host;
+  proxy_set_header   X-Real-IP         $remote_addr;
+  proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+  proxy_set_header   X-Forwarded-Proto $scheme;
+}
+
+location /openapi.json {
+  proxy_pass         http://127.0.0.1:8025/openapi.json;
+  proxy_set_header   Host              $host;
     proxy_set_header   X-Real-IP         $remote_addr;
     proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
     proxy_set_header   X-Forwarded-Proto $scheme;
 }
 ```
+
+Kein zusätzliches `location / { ... }` eintragen. Plesk erzeugt dafür bereits selbst einen Standard-Block; ein zweiter Block führt zu `duplicate location "/"` beim Nginx-Test.
 
 Der Endpoint ist danach erreichbar unter:
 `https://mailer.ihre-domain.de/send`
